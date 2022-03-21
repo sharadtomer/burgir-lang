@@ -14,5 +14,6 @@ export enum NodesType {
     Decrement = "Decrement",
     Statement = "Statement",
     Block = "Block",
-    If = "If"
+    If = "If",
+    Loop = "Loop"
 }

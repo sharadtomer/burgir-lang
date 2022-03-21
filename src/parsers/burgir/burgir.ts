@@ -12,6 +12,7 @@ import { BlockNode } from "./tree-nodes/blockNode";
 import { DeclarationNode } from "./tree-nodes/decalarationNode";
 import { IfNode } from "./tree-nodes/ifNode";
 import { IncrementDecrementNode } from "./tree-nodes/IncrementDecrementNode";
+import { LoopNode } from "./tree-nodes/loopNode";
 import { TreeNode } from "./tree-nodes/node";
 import { PrintNode } from "./tree-nodes/printNode";
 import { ValueKind, ValueNode } from "./tree-nodes/valueNode";
@@ -46,13 +47,14 @@ export class BurgirParser {
     // block
     blockParser: Parser;
     ifParser: Parser;
+    whileLoopParser: Parser;
 
     constructor(){
         this._initParser();
     }
 
     parse(code: string): string {
-        const res = this.ifParser.run(code);
+        const res = this.whileLoopParser.run(code);
         return "";
     }
 
@@ -84,6 +86,7 @@ export class BurgirParser {
         // block parser
         this._initBlockParser();
         this._initIfParser();
+        this._initWhileLoop();
     }
 
     // number parser
@@ -451,6 +454,25 @@ export class BurgirParser {
             return new IfNode(result.value[0].condition, result.value[0].ifBlock, elifBlocks, elseBlock);
         });
 
+    }
+
+    // while loop
+    private _initWhileLoop(){
+        this.whileLoopParser = new SequenceOfParser(
+            this.optionalSpaceParser,
+            new StringParser("khao"),
+            this.optionalSpaceParser,
+            new StringParser("jbtk"),
+            this.optionalSpaceParser,
+            new StringParser("("),
+            this.optionalSpaceParser,
+            this.equationParser,
+            this.optionalSpaceParser,
+            new StringParser(")"),
+            this.blockParser
+        ).map(result => {
+            return new LoopNode(result.value[7], result.value[10])
+        });
     }
 }
 
