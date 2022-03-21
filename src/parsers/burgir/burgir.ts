@@ -9,6 +9,7 @@ import { StringParser } from "../utils/stringParser";
 import { NodesType } from "./nodeTypes";
 import { AssignmentNode } from "./tree-nodes/assignmentNode";
 import { DeclarationNode } from "./tree-nodes/decalarationNode";
+import { IncrementDecrementNode } from "./tree-nodes/IncrementDecrementNode";
 import { TreeNode } from "./tree-nodes/node";
 import { PrintNode } from "./tree-nodes/printNode";
 import { ValueKind, ValueNode } from "./tree-nodes/valueNode";
@@ -26,6 +27,7 @@ export class BurgirParser {
     // space
     spaceParser: Parser;
     optionalSpaceParser: Parser;
+    lineBreak: Parser;
 
     // statements
     operatorParser: Parser;
@@ -33,13 +35,18 @@ export class BurgirParser {
     equationParser: Parser;
     assignmentParser: Parser;
     printStatementParser: Parser;
+    continueStatement: Parser;
+    breakStatement: Parser;
+    incrementStatement: Parser;
+    decrementStatement: Parser;
+    statementParser: Parser;
 
     constructor(){
         this._initParser();
     }
 
     parse(code: string): string {
-        const res = this.printStatementParser.run(code);
+        const res = this.statementParser.run(code);
         return "";
     }
 
@@ -62,6 +69,11 @@ export class BurgirParser {
         this._initDeclarationStatementParser();
         this._initAssignmentParser();
         this._initPrintStatementParser();
+        this._initBreakStatement();
+        this._initContinueStatement();
+        this._initIncrementStatement();
+        this._initDecrementStatement();
+        this._initStatementParser();
 
     }
 
@@ -143,6 +155,14 @@ export class BurgirParser {
             })
             .mapError(err => {
                 return new ParserError("Expected space");
+            });
+
+        this.lineBreak = new RegexParser(/^\r?\n/)
+            .map(res => {
+                return new TreeNode(NodesType.NewLine, "\n");
+            })
+            .mapError(err => {
+                return new ParserError("Expected new line");
             });
     }
 
@@ -262,5 +282,87 @@ export class BurgirParser {
             return new ParserError("Expected print statement");
         });
     }
+
+    // continue statement
+    private _initContinueStatement(){
+        this.continueStatement = new StringParser("agla khao")
+            .map(result => {
+                return new TreeNode(NodesType.Continue, null);
+            })
+            .mapError(err => {
+                return new Error("Expected continue statement");
+            });
+    }
+
+    // break statement
+    private _initBreakStatement(){
+        this.breakStatement = new StringParser("rhne do")
+            .map(result => {
+                return new TreeNode(NodesType.Break, null);
+            })
+            .mapError(err => {
+                return new Error("Expected break statement");
+            });
+    }
+
+    // increment statement
+    private _initIncrementStatement(){
+        this.incrementStatement = new SequenceOfParser(
+            new StringParser("add"),
+            this.spaceParser,
+            this.numberParser,
+            this.spaceParser,
+            new StringParser("cheese"),
+            this.spaceParser,
+            new StringParser("slice"),
+            this.spaceParser,
+            new StringParser("to"),
+            this.spaceParser,
+            this.varNameParser
+        ).map(result => {
+            return new IncrementDecrementNode(NodesType.Increment, result.value[2].value, result.value[10].value)
+        }).mapError(err => {
+            return new ParserError("Expected Increment statement");
+        });
+    }
+
+    // decrement statement
+    private _initDecrementStatement(){
+        this.decrementStatement = new SequenceOfParser(
+            new StringParser("take"),
+            this.spaceParser,
+            this.numberParser,
+            this.spaceParser,
+            new StringParser("bites"),
+            this.spaceParser,
+            new StringParser("from"),
+            this.spaceParser,
+            this.varNameParser
+        ).map(result => {
+            return new IncrementDecrementNode(NodesType.Decrement, result.value[2].value, result.value[8].value)
+        }).mapError(err => {
+            return new ParserError("Expected decrement statement");
+        });
+    }
+
+    // statement parser
+    private _initStatementParser(){
+        this.statementParser = new SequenceOfParser(
+            this.optionalSpaceParser,
+            new ChoiceParser(
+                this.decrementStatement,
+                this.incrementStatement,
+                this.breakStatement,
+                this.continueStatement,
+                this.printStatementParser,
+                this.assignmentParser,
+                this.declarationParser
+            ),
+            this.optionalSpaceParser
+        ).map(result => {
+            return new TreeNode(NodesType.Statement, result.value[1]);
+        });
+    }
+
 }
 
