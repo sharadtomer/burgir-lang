@@ -12,5 +12,7 @@ export enum NodesType {
     Break = "Break",
     Increment = "Increment",
     Decrement = "Decrement",
-    Statement = "Statement"
+    Statement = "Statement",
+    Block = "Block",
+    If = "If"
 }

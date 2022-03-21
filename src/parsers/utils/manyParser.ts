@@ -106,7 +106,8 @@ export class ManyMaxParser extends Parser {
     private _minCount: number;
     private _maxCount: number;
 
-    public ManyMaxParser(parser: Parser, minCount = 0, maxCount = 1) {
+    constructor(parser: Parser, minCount = 0, maxCount = 1) {
+        super();
         this._parser = parser;
         this._minCount = minCount;
         this._maxCount = maxCount;

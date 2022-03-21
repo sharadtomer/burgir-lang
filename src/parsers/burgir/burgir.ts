@@ -2,13 +2,15 @@ import { Parser } from "../base/parser";
 import { ParserError } from "../base/parserError";
 import { BetweenParser } from "../utils/betweenParser";
 import { ChoiceParser } from "../utils/choiceParser";
-import { ManyParser, ManySeptParser } from "../utils/manyParser";
+import { ManyMaxParser, ManyOneParser, ManyParser, ManySeptParser } from "../utils/manyParser";
 import { RegexParser } from "../utils/regexParser";
 import { SequenceOfParser } from "../utils/sequenceOfParser";
 import { StringParser } from "../utils/stringParser";
 import { NodesType } from "./nodeTypes";
 import { AssignmentNode } from "./tree-nodes/assignmentNode";
+import { BlockNode } from "./tree-nodes/blockNode";
 import { DeclarationNode } from "./tree-nodes/decalarationNode";
+import { IfNode } from "./tree-nodes/ifNode";
 import { IncrementDecrementNode } from "./tree-nodes/IncrementDecrementNode";
 import { TreeNode } from "./tree-nodes/node";
 import { PrintNode } from "./tree-nodes/printNode";
@@ -41,12 +43,16 @@ export class BurgirParser {
     decrementStatement: Parser;
     statementParser: Parser;
 
+    // block
+    blockParser: Parser;
+    ifParser: Parser;
+
     constructor(){
         this._initParser();
     }
 
     parse(code: string): string {
-        const res = this.statementParser.run(code);
+        const res = this.ifParser.run(code);
         return "";
     }
 
@@ -75,6 +81,9 @@ export class BurgirParser {
         this._initDecrementStatement();
         this._initStatementParser();
 
+        // block parser
+        this._initBlockParser();
+        this._initIfParser();
     }
 
     // number parser
@@ -149,7 +158,7 @@ export class BurgirParser {
                 return new ParserError("Expected space");
             });
 
-        this.optionalSpaceParser = new RegexParser(/^[\s\b]*/)
+        this.optionalSpaceParser = new RegexParser(/^[ \b]*/)
             .map(res => {
                 return new TreeNode(NodesType.Space, " ");
             })
@@ -185,7 +194,14 @@ export class BurgirParser {
             new StringParser("+"),
             new StringParser("-"),
             new StringParser("*"),
-            new StringParser("/")
+            new StringParser("/"),
+            new StringParser(">="),
+            new StringParser("<="),
+            new StringParser("=="),
+            new StringParser(">"),
+            new StringParser("<"),
+            new StringParser("&&"),
+            new StringParser("||")
         ).map(result => {
             return new TreeNode(NodesType.Operator, result.value);
         }).mapError(err => {
@@ -364,5 +380,77 @@ export class BurgirParser {
         });
     }
 
+    // block parser
+    private _initBlockParser(){
+        this.blockParser = new SequenceOfParser(
+            this.optionalSpaceParser,
+            new StringParser("{"),
+            this.optionalSpaceParser,
+            this.lineBreak,
+            new ManySeptParser(
+                this.statementParser,
+                this.lineBreak
+            ),
+            this.lineBreak,
+            this.optionalSpaceParser,
+            new StringParser("}"),
+            this.optionalSpaceParser
+        ).map(result => {
+            return new BlockNode(result.value[4].value);
+        });
+    }
+
+    // if statement
+    private _initIfParser(){
+        const tempIf = new SequenceOfParser(
+            this.optionalSpaceParser,
+            new StringParser("agr"),
+            this.optionalSpaceParser,
+            new StringParser("("),
+            this.optionalSpaceParser,
+            this.equationParser,
+            this.optionalSpaceParser,
+            new StringParser(")"),
+            this.blockParser
+        ).map(result => {
+            return new IfNode(result.value[5], result.value[8])
+        });
+
+        const elif = new SequenceOfParser(
+            this.optionalSpaceParser,
+            new StringParser("ni"),
+            this.spaceParser,
+            new StringParser("to"),
+            this.spaceParser,
+            tempIf
+        );
+
+        const elseParser = new SequenceOfParser(
+            this.optionalSpaceParser,
+            new StringParser("ni"),
+            this.spaceParser,
+            new StringParser("to"),
+            this.optionalSpaceParser,
+            this.blockParser
+        );
+
+        this.ifParser = new SequenceOfParser(
+            tempIf,
+            new ManyParser(elif),
+            new ManyMaxParser(elseParser, 0, 1),
+        ).map(result => {
+            const elifBlocks = [];
+            for(let i = 0; i < result.value[1].value.length; i++){
+                elifBlocks.push(result.value[1].value[i].value[5]);
+            }
+
+            let elseBlock = null;
+            if(result.value[2].value.length){
+                elseBlock = result.value[2].value[0].value[5];
+            }
+            return new IfNode(result.value[0].condition, result.value[0].ifBlock, elifBlocks, elseBlock);
+        });
+
+    }
 }
 
