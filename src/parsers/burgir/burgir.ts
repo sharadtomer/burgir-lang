@@ -18,6 +18,13 @@ import { PrintNode } from "./tree-nodes/printNode";
 import { ValueKind, ValueNode } from "./tree-nodes/valueNode";
 import { VarNameNode } from "./tree-nodes/varNameNode";
 
+
+const lazy = (fn) => {
+    return new Parser((state) => {
+        const p = fn();
+        return p.parse(state);
+    });
+}
 export class BurgirParser {
 
     // value parsers
@@ -214,12 +221,6 @@ export class BurgirParser {
 
     // equation parser
     private _initEquationParser(){
-        const lazy = (fn) => {
-            return new Parser((state) => {
-                const p = fn();
-                return p.parse(state);
-            });
-        }
 
         const _tempEqParser = 
                 new ManySeptParser(
@@ -385,13 +386,20 @@ export class BurgirParser {
 
     // block parser
     private _initBlockParser(){
+
+        const self = this;
+
         this.blockParser = new SequenceOfParser(
             this.optionalSpaceParser,
             new StringParser("{"),
             this.optionalSpaceParser,
             this.lineBreak,
             new ManySeptParser(
-                this.statementParser,
+                new ChoiceParser(
+                    this.statementParser,
+                    lazy(() => this.ifParser),
+                    lazy(() => this.whileLoopParser)
+                ),
                 this.lineBreak
             ),
             this.lineBreak,
