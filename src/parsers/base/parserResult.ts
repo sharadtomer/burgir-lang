@@ -2,7 +2,7 @@
 // class represents parser result
 export class ParserResult {
 
-    value: any;
+    value?: any;
 
     constructor(value: any){
         this.value = value;

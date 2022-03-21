@@ -53,11 +53,14 @@ export class ManySeptParser extends Parser {
     private _septByParser: Parser;
 
     private _minCount: number;
+    private _includeSeptResult: boolean;
 
-    public ManySeptParser(parser: Parser, septBy: Parser, minCount = -1) {
+    constructor(parser: Parser, septBy: Parser, includeSeptResult = false, minCount = -1) {
+        super();
         this._parser = parser;
         this._septByParser = septBy;
         this._minCount = minCount;
+        this._includeSeptResult = includeSeptResult;
     }
 
     parse(state: ParserState): ParserState {
@@ -67,22 +70,29 @@ export class ManySeptParser extends Parser {
 
         const results: ParserResult[] = [];
         let nextState = state;
+        let resCount = 0;
+        let septResult = null;
 
         while (!nextState.isError) {
             nextState = this._parser.parse(nextState);
             if (!nextState.isError) {
+                resCount++;
+                if(this._includeSeptResult && septResult){
+                    results.push(septResult);
+                }
                 results.push(nextState.result);
                 state = nextState;
             }
 
             nextState = this._septByParser.parse(nextState);
+            septResult = nextState.result;
         }
 
-        if (results.length < this._minCount) {
+        if (resCount < this._minCount) {
             return this.updateError(
                 state,
                 new ParserError(
-                    `expected ${this._minCount} counts, but got ${results.length} counts`
+                    `expected ${this._minCount} counts, but got ${resCount} counts`
                 )
             );
         } else {

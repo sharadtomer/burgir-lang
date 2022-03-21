@@ -2,36 +2,67 @@ import { Parser } from "../base/parser";
 import { ParserError } from "../base/parserError";
 import { BetweenParser } from "../utils/betweenParser";
 import { ChoiceParser } from "../utils/choiceParser";
+import { ManyParser, ManySeptParser } from "../utils/manyParser";
 import { RegexParser } from "../utils/regexParser";
 import { SequenceOfParser } from "../utils/sequenceOfParser";
 import { StringParser } from "../utils/stringParser";
+import { NodesType } from "./nodeTypes";
+import { AssignmentNode } from "./tree-nodes/assignmentNode";
+import { DeclarationNode } from "./tree-nodes/decalarationNode";
+import { TreeNode } from "./tree-nodes/node";
+import { PrintNode } from "./tree-nodes/printNode";
 import { ValueKind, ValueNode } from "./tree-nodes/valueNode";
 import { VarNameNode } from "./tree-nodes/varNameNode";
 
 export class BurgirParser {
 
+    // value parsers
     numberParser: Parser;
     stringValueParser: Parser;
     booleanValueParser: Parser;
     varNameParser: Parser;
     valueParser: Parser;
 
+    // space
+    spaceParser: Parser;
+    optionalSpaceParser: Parser;
+
+    // statements
+    operatorParser: Parser;
+    declarationParser: Parser;
+    equationParser: Parser;
+    assignmentParser: Parser;
+    printStatementParser: Parser;
 
     constructor(){
         this._initParser();
     }
 
     parse(code: string): string {
-        const res = this.valueParser.run(code);
+        const res = this.printStatementParser.run(code);
         return "";
     }
 
     private _initParser(){
+        // value parsers
         this._initNumParser();
         this._initStringParser();
         this._initBoolValueParser();
         this._initVarNameParser();
         this._initValueParser();
+
+        // space parser
+        this._initSpaceParser();
+
+        // equation parser
+        this._initOperatorParser();
+        this._initEquationParser();
+
+        // statement parsers
+        this._initDeclarationStatementParser();
+        this._initAssignmentParser();
+        this._initPrintStatementParser();
+
     }
 
     // number parser
@@ -53,7 +84,7 @@ export class BurgirParser {
             new StringParser('"'),
             new RegexParser(/^[^"]*/)
         ).map(result => {
-            return new ValueNode(ValueKind.String, result.value.value);
+            return new ValueNode(ValueKind.String, `"${result.value.value}"`);
         }).mapError(err => {
             return new ParserError(`Expected string`)
         });
@@ -94,6 +125,142 @@ export class BurgirParser {
         }).mapError(err => {
             return new ParserError("Expected value");
         })
+    }
+
+    // space parser, includes spaces, tabs, linebreaks
+    private _initSpaceParser(){
+        this.spaceParser = new RegexParser(/^[\s\b]+/)
+            .map(res => {
+                return new TreeNode(NodesType.Space, " ");
+            })
+            .mapError(err => {
+                return new ParserError("Expected space");
+            });
+
+        this.optionalSpaceParser = new RegexParser(/^[\s\b]*/)
+            .map(res => {
+                return new TreeNode(NodesType.Space, " ");
+            })
+            .mapError(err => {
+                return new ParserError("Expected space");
+            });
+    }
+
+    // declaration statement
+    private _initDeclarationStatementParser(){
+        this.declarationParser = new SequenceOfParser(
+            new StringParser("burgir"),
+            this.spaceParser,
+            this.varNameParser
+        ).map(result => {
+            return new DeclarationNode(result.value[2].value);
+        }).mapError(err => {
+            return new ParserError("Declaration expected");
+        });
+    }
+
+    // operators
+    private _initOperatorParser() {
+        this.operatorParser = new ChoiceParser(
+            new StringParser("+"),
+            new StringParser("-"),
+            new StringParser("*"),
+            new StringParser("/")
+        ).map(result => {
+            return new TreeNode(NodesType.Operator, result.value);
+        }).mapError(err => {
+            return new ParserError("Expected operator");
+        })
+    }
+
+    // equation parser
+    private _initEquationParser(){
+        const lazy = (fn) => {
+            return new Parser((state) => {
+                const p = fn();
+                return p.parse(state);
+            });
+        }
+
+        const _tempEqParser = 
+                new ManySeptParser(
+                    new ChoiceParser(
+                        this.valueParser,
+                        lazy(() => {
+                            return _paranEnclosedEquation;
+                        })
+                    ),
+                    new SequenceOfParser(
+                        this.optionalSpaceParser,
+                        this.operatorParser,
+                        this.optionalSpaceParser
+                    ).map(result => {
+                        return new TreeNode(NodesType.Operator, result.value[1].value)
+                    }),
+                    true
+                ).map(result => {
+                    return new TreeNode(NodesType.Equation, result.value.map(v => v.value).join(" "));
+                }).mapError(err => {
+                    return new ParserError("Equation expected");
+                });
+        
+        var _paranEnclosedEquation = 
+                new BetweenParser(
+                    new StringParser("("),
+                    new StringParser(")"),
+                    new SequenceOfParser(
+                        this.optionalSpaceParser,
+                        _tempEqParser,
+                        this.optionalSpaceParser
+                    ).map(result => {
+                        return new TreeNode(NodesType.Equation, result.value[1].value)
+                    })
+                ).map(result => {
+                    return new TreeNode(NodesType.Equation, `( ${result.value.value} )`);
+                });
+
+        this.equationParser = _tempEqParser;
+    }
+
+    // assignment equation
+    private _initAssignmentParser(){
+        this.assignmentParser = new SequenceOfParser(
+            new ChoiceParser(
+                this.declarationParser,
+                this.varNameParser
+            ),
+            this.optionalSpaceParser,
+            new StringParser("="),
+            this.optionalSpaceParser,
+            this.equationParser
+        ).map(result => {
+            return new AssignmentNode(
+                result.value[0],
+                result.value[4]
+            );
+        }).mapError(err => {
+            return new ParserError("Expected assignment statement");
+        })
+    }
+
+    // print statement parser
+    private _initPrintStatementParser(){
+        this.printStatementParser = new SequenceOfParser(
+            new StringParser("deliver"),
+            this.spaceParser,
+            new ManySeptParser(
+                this.equationParser, 
+                new SequenceOfParser(
+                    this.optionalSpaceParser,
+                    new StringParser(","),
+                    this.optionalSpaceParser
+                )
+            )
+        ).map(result => {
+            return new PrintNode(result.value[2].value);
+        }).mapError(err => {
+            return new ParserError("Expected print statement");
+        });
     }
 }
 
