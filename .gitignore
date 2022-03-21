@@ -1,0 +1,8 @@
+node_modules
+dist
+.vs
+input
+output
+.vscode
+package-lock.json
+
