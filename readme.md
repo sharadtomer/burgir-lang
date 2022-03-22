@@ -17,8 +17,8 @@ Usual data types like number, string, boolean are supported
 
 * Boolean
 
-    `'accha burgir'` is boolean true value
-    `'ganda burgir'` is boolean false value
+    `accha burgir` is boolean true value
+    `ganda burgir` is boolean false value
 
 ## Variable names
 Variable name follow following rules:
@@ -61,7 +61,7 @@ Output is displayed using `deliver` keyword on console like
 deliver bdaBurgir, maharajaMac, 5 + 3
 
 ## Conditional
-if, else if, else is comparisons are made using `'agr'`, `'ni to agr'`, `'ni to'` keywords like
+if, else if, else is comparisons are made using `agr`, `ni to agr`, `ni to` keywords like
 
     agr(condition){
 
@@ -74,14 +74,14 @@ if, else if, else is comparisons are made using `'agr'`, `'ni to agr'`, `'ni to'
     }
 
 ## Loops
-Burger lang supports only one loop while loop using `'khao jbtk'` keyword, example:
+Burger lang supports only one loop while loop using `khao jbtk` keyword, example:
 
     khao jbtk(condition) {
 
     }
 
 ### • break statement
-break statement is inserted using the `'rhne do'` keyword
+break statement is inserted using the `rhne do` keyword
 
 ### • continue statement
-continue statement is inserted using the `'agla khao'` keyword
+continue statement is inserted using the `agla khao` keyword
