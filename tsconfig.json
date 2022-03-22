@@ -2,6 +2,7 @@
     "compilerOptions": {
         "module": "CommonJS",
         "esModuleInterop": true,
+        "allowJs": true,
         "allowSyntheticDefaultImports": true,
         "target": "es6",
         "noImplicitAny": false,
@@ -16,6 +17,7 @@
         
     },
     "include": [
+        "bin/*",
         "src/**/*",
         "index.ts"
     ]

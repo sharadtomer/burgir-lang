@@ -1,14 +1,15 @@
 import { NodesType } from "../nodeTypes";
+import { BlockNode } from "./blockNode";
 import { TreeNode } from "./node";
 
 export class LoopNode extends TreeNode {
 
     condition: TreeNode;
-    value: TreeNode[];
+    value: BlockNode;
 
-    constructor(condition: TreeNode, values: TreeNode[] = []){
+    constructor(condition: TreeNode, value: BlockNode){
         super(NodesType.Loop);
-        this.value = values;
+        this.value = value;
         this.condition = condition;
     }
 }
