@@ -50,19 +50,23 @@ export class BurgirParser {
     incrementStatement: Parser;
     decrementStatement: Parser;
     statementParser: Parser;
+    emptyLineStatement: Parser;
 
     // block
     blockParser: Parser;
     ifParser: Parser;
     whileLoopParser: Parser;
 
+    // language parser
+    languageParser: Parser;
+
     constructor(){
         this._initParser();
     }
 
-    parse(code: string): string {
-        const res = this.whileLoopParser.run(code);
-        return "";
+    parse(code: string) {
+        const res = this.languageParser.run(code);
+        return res;
     }
 
     private _initParser(){
@@ -94,6 +98,9 @@ export class BurgirParser {
         this._initBlockParser();
         this._initIfParser();
         this._initWhileLoop();
+
+        // language parser
+        this._initLanguageParser();
     }
 
     // number parser
@@ -102,9 +109,6 @@ export class BurgirParser {
         this.numberParser = new RegexParser(numRegex)
             .map((result) => {
                 return new ValueNode(ValueKind.Number, parseFloat(result.value));
-            })
-            .mapError((err) => {
-                return new ParserError(`Expected number `);
             });
     }
 
@@ -116,8 +120,6 @@ export class BurgirParser {
             new RegexParser(/^[^"]*/)
         ).map(result => {
             return new ValueNode(ValueKind.String, `"${result.value.value}"`);
-        }).mapError(err => {
-            return new ParserError(`Expected string`)
         });
     }
 
@@ -128,8 +130,6 @@ export class BurgirParser {
             new StringParser("ganda burgir")
         ).map(result => {
             return new ValueNode(ValueKind.Boolean, result.value === "accha burgir");
-        }).mapError(err => {
-            return new ParserError(`Expected boolean`);
         });
     }
 
@@ -138,9 +138,6 @@ export class BurgirParser {
         this.varNameParser = new RegexParser(/^\w[\w\d]*Burgir/)
             .map(result => {
                 return new VarNameNode(result.value);
-            })
-            .mapError(err => {
-                return new ParserError(`Expected varname`);
             });
     }
 
@@ -153,9 +150,7 @@ export class BurgirParser {
             this.varNameParser
         ).map(result => {
             return result;
-        }).mapError(err => {
-            return new ParserError("Expected value");
-        })
+        });
     }
 
     // space parser, includes spaces, tabs, linebreaks
@@ -163,26 +158,19 @@ export class BurgirParser {
         this.spaceParser = new RegexParser(/^[\s\b]+/)
             .map(res => {
                 return new TreeNode(NodesType.Space, " ");
-            })
-            .mapError(err => {
-                return new ParserError("Expected space");
             });
 
         this.optionalSpaceParser = new RegexParser(/^[ \b]*/)
             .map(res => {
                 return new TreeNode(NodesType.Space, " ");
-            })
-            .mapError(err => {
-                return new ParserError("Expected space");
             });
 
         this.lineBreak = new RegexParser(/^\r?\n/)
             .map(res => {
                 return new TreeNode(NodesType.NewLine, "\n");
-            })
-            .mapError(err => {
-                return new ParserError("Expected new line");
             });
+        
+        
     }
 
     // declaration statement
@@ -193,8 +181,6 @@ export class BurgirParser {
             this.varNameParser
         ).map(result => {
             return new DeclarationNode(result.value[2].value);
-        }).mapError(err => {
-            return new ParserError("Declaration expected");
         });
     }
 
@@ -214,9 +200,7 @@ export class BurgirParser {
             new StringParser("||")
         ).map(result => {
             return new TreeNode(NodesType.Operator, result.value);
-        }).mapError(err => {
-            return new ParserError("Expected operator");
-        })
+        });
     }
 
     // equation parser
@@ -240,8 +224,6 @@ export class BurgirParser {
                     true
                 ).map(result => {
                     return new TreeNode(NodesType.Equation, result.value.map(v => v.value).join(" "));
-                }).mapError(err => {
-                    return new ParserError("Equation expected");
                 });
         
         var _paranEnclosedEquation = 
@@ -278,9 +260,7 @@ export class BurgirParser {
                 result.value[0],
                 result.value[4]
             );
-        }).mapError(err => {
-            return new ParserError("Expected assignment statement");
-        })
+        });
     }
 
     // print statement parser
@@ -298,8 +278,6 @@ export class BurgirParser {
             )
         ).map(result => {
             return new PrintNode(result.value[2].value);
-        }).mapError(err => {
-            return new ParserError("Expected print statement");
         });
     }
 
@@ -308,9 +286,6 @@ export class BurgirParser {
         this.continueStatement = new StringParser("agla khao")
             .map(result => {
                 return new TreeNode(NodesType.Continue, null);
-            })
-            .mapError(err => {
-                return new Error("Expected continue statement");
             });
     }
 
@@ -319,9 +294,6 @@ export class BurgirParser {
         this.breakStatement = new StringParser("rhne do")
             .map(result => {
                 return new TreeNode(NodesType.Break, null);
-            })
-            .mapError(err => {
-                return new Error("Expected break statement");
             });
     }
 
@@ -341,8 +313,6 @@ export class BurgirParser {
             this.varNameParser
         ).map(result => {
             return new IncrementDecrementNode(NodesType.Increment, result.value[2].value, result.value[10].value)
-        }).mapError(err => {
-            return new ParserError("Expected Increment statement");
         });
     }
 
@@ -360,13 +330,19 @@ export class BurgirParser {
             this.varNameParser
         ).map(result => {
             return new IncrementDecrementNode(NodesType.Decrement, result.value[2].value, result.value[8].value)
-        }).mapError(err => {
-            return new ParserError("Expected decrement statement");
         });
     }
 
     // statement parser
     private _initStatementParser(){
+        this.emptyLineStatement = new ManyParser(
+            new SequenceOfParser(
+                this.optionalSpaceParser,
+                this.lineBreak,
+                this.optionalSpaceParser
+            )  
+        );
+
         this.statementParser = new SequenceOfParser(
             this.optionalSpaceParser,
             new ChoiceParser(
@@ -395,12 +371,17 @@ export class BurgirParser {
             this.optionalSpaceParser,
             this.lineBreak,
             new ManySeptParser(
+                // this.statementParser,
                 new ChoiceParser(
                     this.statementParser,
                     lazy(() => this.ifParser),
                     lazy(() => this.whileLoopParser)
                 ),
-                this.lineBreak
+                new SequenceOfParser(
+                    this.optionalSpaceParser,
+                    this.lineBreak,
+                    this.optionalSpaceParser
+                )                
             ),
             this.lineBreak,
             this.optionalSpaceParser,
@@ -480,6 +461,26 @@ export class BurgirParser {
             this.blockParser
         ).map(result => {
             return new LoopNode(result.value[7], result.value[10])
+        });
+    }
+
+    // language parser
+    private _initLanguageParser(){
+        this.languageParser = 
+        new SequenceOfParser(
+            this.emptyLineStatement,
+            new ManySeptParser(
+                new ChoiceParser(
+                    this.ifParser,
+                    this.whileLoopParser,
+                    this.statementParser
+                ),
+                
+                this.emptyLineStatement
+            ),
+            this.emptyLineStatement
+        ).map(result => {
+            return result.value[1];
         });
     }
 }
